@@ -72,15 +72,22 @@ class GitBranches < Array
 
   def self.load(options)
     git_branches = new
-    branches = if options[:local]
+
+    # when a block is provided the caller is
+    # going to be filtering
+    branches = if options[:filter]
+     local_branches + remote_branches
+    elsif options[:local]
       local_branches
     elsif options[:remote]
       remote_branches
     end
 
-    branches.each do |branch|
-      raw_commits = `git cherry -v #{UPSTREAM} #{branch}`.split(/\n/).map{ |c| GitCommit.new(c) }
-      git_branches << GitBranch.new(branch, raw_commits)
+    branches.each do |branch_name|
+      next if options[:filter] && !options[:filter].call(branch_name)
+
+      raw_commits = `git cherry -v #{UPSTREAM} #{branch_name}`.split(/\n/).map{ |c| GitCommit.new(c) }
+      git_branches << GitBranch.new(branch_name, raw_commits)
     end
     git_branches
   end
@@ -108,9 +115,14 @@ class GitUnmerged
   end
 
   def load
-    @branches ||= GitBranches.load(:local => local?, :remote => remote?)
-    @branches.reject!{|b| @options[:exclude].include?(b.name)} if @options[:exclude].is_a?(Array)
-    @branches.select!{|b| @options[:only].include?(b.name)} if @options[:only].is_a?(Array)
+    branch_filter = if @options[:only] || @options[:exclude]
+      lambda do |branch_name|
+        (@options[:only] && @options[:only].include?(branch_name)) ||
+          (@options[:exclude] && !@options[:exclude].include?(branch_name))
+      end
+    end
+
+    @branches ||= GitBranches.load(:local => local?, :remote => remote?, filter: branch_filter)
   end
 
   def print_overview
