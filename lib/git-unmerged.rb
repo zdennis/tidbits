@@ -146,6 +146,7 @@ class GitUnmerged
     if branches.any_missing_commits?
       puts "The following branches possibly have commits not merged to #{upstream}:"
       branches.each do |branch|
+        next if branch.unmerged_commits.empty? && !show_equivalent_commits?
         num_unmerged = yellow(branch.unmerged_commits.size.to_s)
         num_equivalent = green(branch.equivalent_commits.size.to_s)
         puts %|  #{branch.name} (#{num_unmerged}/#{num_equivalent} commits)|
@@ -227,9 +228,10 @@ class GitUnmerged
     puts
     print_legend
     branches.each do |branch|
+      next if branch.unmerged_commits.empty? && !prune? && !show_equivalent_commits?
       puts
       print "#{branch.name}:"
-      if branch.unmerged_commits.empty? && !show_equivalent_commits?
+      if branch.unmerged_commits.empty?
         print "(no unmerged commits"
         if prune?
           print ",", red(" this will be pruned")
@@ -252,7 +254,7 @@ class GitUnmerged
   def print_legend
     load
     puts "  " + yellow("yellow") + " commits have not been merged"
-    puts "  " + green("green") + " commits have equivalent changes in #{UPSTREAM} but different SHAs" if show_equivalent_commits?
+    puts "  " + green("green") + " commits have equivalent changes in #{UPSTREAM} but different SHAs"
   end
 
   def prune
